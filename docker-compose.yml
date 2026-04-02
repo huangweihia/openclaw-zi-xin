@@ -1,0 +1,60 @@
+# MAX 版：与 1.0 共用同一 Docker 网络里的 MySQL / Redis，独立 Web 端口与代码目录。
+# 1.0 栈须已启动（网络名：ai-side-laravel_ai_side_network）。
+# 启动：docker compose up -d
+name: ai-side-laravel-max
+
+services:
+    php:
+        image: ai-side-laravel-php
+        container_name: ai_side_php_max
+        restart: unless-stopped
+        working_dir: /var/www/html
+        ports:
+            - "8082:80"
+        volumes:
+            - .:/var/www/html
+            - max_vendor:/var/www/html/vendor
+        env_file:
+            - .env
+        networks:
+            - ai_side_shared
+
+    scheduler:
+        image: ai-side-laravel-scheduler
+        container_name: ai_side_scheduler_max
+        restart: unless-stopped
+        working_dir: /var/www/html
+        volumes:
+            - .:/var/www/html
+            - max_vendor:/var/www/html/vendor
+        env_file:
+            - .env
+        command: ["sh", "-c", "while true; do php artisan schedule:run --no-ansi; sleep 60; done"]
+        networks:
+            - ai_side_shared
+        depends_on:
+            - php
+
+    worker:
+        image: ai-side-laravel-worker
+        container_name: ai_side_worker_max
+        restart: unless-stopped
+        working_dir: /var/www/html
+        volumes:
+            - .:/var/www/html
+            - max_vendor:/var/www/html/vendor
+        env_file:
+            - .env
+        command: ["php", "artisan", "queue:work", "--sleep=3", "--tries=3", "--max-time=3600"]
+        networks:
+            - ai_side_shared
+        depends_on:
+            - php
+
+networks:
+    ai_side_shared:
+        external: true
+        name: ai-side-laravel_ai_side_network
+
+volumes:
+    max_vendor:

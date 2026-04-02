@@ -1,0 +1,23 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        // 添加唯一索引
+        Schema::table('articles', function (Blueprint $table) {
+            $table->unique('source_url', 'articles_source_url_unique');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('articles', function (Blueprint $table) {
+            $table->dropUnique('articles_source_url_unique');
+        });
+    }
+};

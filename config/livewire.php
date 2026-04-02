@@ -1,0 +1,52 @@
+<?php
+
+return [
+
+    'class_namespace' => 'App\\Livewire',
+
+    'view_path' => resource_path('views/livewire'),
+
+    'layout' => 'components.layouts.app',
+
+    'lazy_placeholder' => null,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Temporary File Uploads (Filament / Livewire)
+    |--------------------------------------------------------------------------
+    | 使用 local 盘（storage/app），与 config/filesystems.php 一致；
+    | 规则需与后台 FileUpload maxSize（KB）及 Nginx client_max_body_size 匹配。
+    */
+    'temporary_file_upload' => [
+        'disk' => 'local',
+        'rules' => ['required', 'file', 'max:12288'],
+        'directory' => 'livewire-tmp',
+        'middleware' => null,
+        'preview_mimes' => [
+            'png', 'gif', 'bmp', 'svg', 'wav', 'mp4',
+            'mov', 'avi', 'wmv', 'mp3', 'm4a',
+            'jpg', 'jpeg', 'mpga', 'webp', 'wma',
+        ],
+        'max_upload_time' => 5,
+        'cleanup' => true,
+    ],
+
+    'render_on_redirect' => false,
+
+    'legacy_model_binding' => false,
+
+    'inject_assets' => true,
+
+    'navigate' => [
+        'show_progress_bar' => true,
+        'progress_bar_color' => '#2299dd',
+    ],
+
+    'inject_morph_markers' => true,
+
+    'smart_wire_keys' => false,
+
+    'pagination_theme' => 'tailwind',
+
+    'release_token' => 'a',
+];
