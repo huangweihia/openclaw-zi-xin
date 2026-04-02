@@ -98,6 +98,19 @@
                     <div class="text-gray-600 mt-2">累计变现</div>
                 </div>
             </div>
+            
+            <!-- 实时动态 -->
+            <div class="mt-12 bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-6 overflow-hidden">
+                <div class="flex items-center gap-3 mb-4">
+                    <span class="text-2xl">🎉</span>
+                    <span class="font-bold text-gray-700">实时动态</span>
+                </div>
+                <div class="relative h-12 overflow-hidden">
+                    <div id="realtime-activities" class="space-y-3">
+                        <!-- 动态内容将通过 JS 滚动显示 -->
+                    </div>
+                </div>
+            </div>
         </div>
     </section>
 
@@ -494,5 +507,60 @@
             </div>
         </div>
     </footer>
+</body>
+</html>
+
+    <script>
+    // 实时动态数据
+    const activities = [
+        { icon: '🎉', user: '用户 138****5678', action: '刚刚开通 VIP 会员', time: '刚刚' },
+        { icon: '💰', user: '用户 189****1234', action: '通过案例赚到第一笔钱（580 元）', time: '1 分钟前' },
+        { icon: '📝', user: '用户 156****9876', action: '刚刚发布了副业案例', time: '2 分钟前' },
+        { icon: '⭐', user: '用户 139****4321', action: '收藏了《小红书虚拟资料变现》', time: '3 分钟前' },
+        { icon: '🚀', user: '用户 186****7890', action: '开始学习《Midjourney 变现指南》', time: '5 分钟前' },
+        { icon: '💎', user: '用户 135****2468', action: '升级为 SVIP 会员', time: '8 分钟前' },
+        { icon: '📚', user: '用户 188****1357', action: '完成了《AI 工具变现地图》学习', time: '10 分钟前' },
+        { icon: '🎯', user: '用户 137****9753', action: '发布了新的经验心得', time: '15 分钟前' },
+    ];
+
+    let currentIndex = 0;
+
+    function renderActivity() {
+        const container = document.getElementById('realtime-activities');
+        const activity = activities[currentIndex];
+        
+        container.innerHTML = `
+            <div class="flex items-center gap-3 animate-fade-in">
+                <span class="text-2xl">${activity.icon}</span>
+                <span class="text-gray-700">
+                    <span class="font-medium">${activity.user}</span>
+                    <span class="text-gray-600"> ${activity.action}</span>
+                    <span class="text-sm text-gray-500 ml-2">· ${activity.time}</span>
+                </span>
+            </div>
+        `;
+        
+        currentIndex = (currentIndex + 1) % activities.length;
+    }
+
+    // 初始显示
+    renderActivity();
+
+    // 每 5 秒切换
+    setInterval(renderActivity, 5000);
+
+    // 淡入动画
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+    `;
+    document.head.appendChild(style);
+    </script>
 </body>
 </html>
