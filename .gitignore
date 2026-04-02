@@ -30,6 +30,9 @@ Thumbs.db
 .idea/
 .vscode/
 
+# Docs (keep README.md at repo root only)
+docs/*.md
+
 # Misc
 npm-debug.log*
 yarn-debug.log*
