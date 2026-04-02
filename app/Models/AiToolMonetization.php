@@ -10,101 +10,39 @@ class AiToolMonetization extends Model
     use HasFactory;
 
     protected $fillable = [
-        'tool_name',
-        'tool_url',
-        'tool_logo',
-        'category',
-        'description',
-        'monetization_scenarios',
-        'prompt_templates',
-        'delivery_standards',
-        'pricing_guide',
-        'client_channels',
-        'is_domestic',
-        'pricing_model',
-        'popularity_score',
-        'is_vip_only',
-        'view_count',
+        'tool_name', 'slug', 'tool_url',
+        'category', 'available_in_china', 'pricing_model',
+        'content',
+        'monetization_scenes', 'prompt_templates', 'pricing_reference',
+        'channels', 'delivery_standards',
+        'visibility',
+        'view_count', 'like_count', 'favorite_count',
     ];
 
     protected $casts = [
-        'is_domestic' => 'boolean',
-        'is_vip_only' => 'boolean',
-        'monetization_scenarios' => 'array',
+        'available_in_china' => 'boolean',
+        'monetization_scenes' => 'array',
         'prompt_templates' => 'array',
+        'pricing_reference' => 'array',
+        'channels' => 'array',
         'delivery_standards' => 'array',
-        'pricing_guide' => 'array',
-        'client_channels' => 'array',
-        'popularity_score' => 'integer',
-        'view_count' => 'integer',
     ];
 
+    // 关联评论
     public function comments()
     {
         return $this->morphMany(Comment::class, 'commentable');
     }
 
-    public function likes()
+    // 作用域：可见
+    public function scopeVisible($query, $user = null)
     {
-        return $this->morphMany(UserLike::class, 'likeable');
-    }
-
-    public function saves()
-    {
-        return $this->morphMany(UserSave::class, 'savable');
-    }
-
-    public function scopeDomestic($query)
-    {
-        return $query->where('is_domestic', true);
-    }
-
-    public function scopeInternational($query)
-    {
-        return $query->where('is_domestic', false);
-    }
-
-    public function scopeVipOnly($query)
-    {
-        return $query->where('is_vip_only', true);
-    }
-
-    public function scopeByCategory($query, string $category)
-    {
-        return $query->where('category', $category);
-    }
-
-    public function scopePopular($query, int $minScore = 70)
-    {
-        return $query->where('popularity_score', '>=', $minScore);
-    }
-
-    /**
-     * 获取分类标签
-     */
-    public function getCategoryLabelAttribute(): string
-    {
-        return match($this->category) {
-            'image' => '图像生成',
-            'text' => '文本写作',
-            'video' => '视频制作',
-            'audio' => '音频处理',
-            'code' => '代码编程',
-            default => '其他',
-        };
-    }
-
-    /**
-     * 获取定价模式标签
-     */
-    public function getPricingModelLabelAttribute(): string
-    {
-        return match($this->pricing_model) {
-            'free' => '免费',
-            'subscription' => '订阅制',
-            'pay_per_use' => '按量付费',
-            'freemium' => '免费 + 付费',
-            default => '未知',
-        };
+        return $query->where(function ($q) use ($user) {
+            $q->where('visibility', 'public');
+            
+            if ($user && $user->isVip()) {
+                $q->orWhere('visibility', 'vip');
+            }
+        });
     }
 }

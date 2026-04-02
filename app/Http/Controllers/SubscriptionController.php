@@ -2,136 +2,153 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\EmailSubscription;
+use App\Models\Subscription;
+use App\Models\Order;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class SubscriptionController extends Controller
 {
-    /**
-     * 显示退订页面
-     */
-    public function showUnsubscribe(string $token)
+    protected NotificationService $notificationService;
+
+    public function __construct(NotificationService $notificationService)
     {
-        $subscription = EmailSubscription::getByToken($token);
-        
-        if (!$subscription) {
-            abort(404, '订阅不存在');
-        }
-        
-        return view('subscriptions.unsubscribe', compact('subscription'));
+        $this->notificationService = $notificationService;
     }
 
     /**
-     * 处理退订
+     * 我的订阅
      */
-    public function unsubscribe(Request $request, string $token)
+    public function index()
     {
-        $subscription = EmailSubscription::getByToken($token);
+        $subscriptions = Subscription::where('user_id', Auth::id())
+            ->latest()
+            ->paginate(10);
         
-        if (!$subscription) {
-            abort(404, '订阅不存在');
-        }
-        
-        $type = $request->input('type', 'all');
-        
-        match ($type) {
-            'daily' => $subscription->update(['subscribed_to_daily' => false]),
-            'weekly' => $subscription->update(['subscribed_to_weekly' => false]),
-            'notifications' => $subscription->update(['subscribed_to_notifications' => false]),
-            default => $subscription->unsubscribeAll(),
-        };
-        
-        return view('subscriptions.unsubscribed', compact('subscription', 'type'));
+        return view('max.subscriptions.index', compact('subscriptions'));
     }
 
     /**
-     * 重新订阅
+     * 续费订阅
      */
-    public function resubscribe(string $token)
+    public function renew($id)
     {
-        $subscription = EmailSubscription::getByToken($token);
+        $subscription = Subscription::where('user_id', Auth::id())->findOrFail($id);
         
-        if (!$subscription) {
-            abort(404, '订阅不存在');
-        }
-        
-        $subscription->resubscribe();
-        
-        return view('subscriptions.resubscribed', compact('subscription'));
-    }
-
-    /**
-     * 显示订阅偏好设置（需要登录）
-     */
-    public function preferences()
-    {
-        $user = auth()->user();
-        $subscription = EmailSubscription::getByEmail($user->email);
-        
-        if (!$subscription) {
-            $subscription = EmailSubscription::create([
-                'user_id' => $user->id,
-                'email' => $user->email,
-            ]);
-        }
-        
-        return view('subscriptions.preferences', compact('subscription'));
-    }
-
-    /**
-     * 更新订阅偏好（支持 JSON/AJAX：请求头 Accept: application/json）
-     */
-    public function updatePreferences(Request $request)
-    {
-        $user = auth()->user();
-        $subscription = EmailSubscription::getByEmail($user->email);
-
-        if (! $subscription) {
-            $subscription = EmailSubscription::create([
-                'user_id' => $user->id,
-                'email' => $user->email,
-            ]);
-        }
-
-        try {
-            $request->validate([
-                'subscribed_to_daily' => 'sometimes|boolean',
-                'subscribed_to_weekly' => 'sometimes|boolean',
-                'subscribed_to_notifications' => 'sometimes|boolean',
-            ]);
-        } catch (ValidationException $e) {
-            if ($request->expectsJson()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => '验证失败',
-                    'errors' => $e->errors(),
-                ], 422);
-            }
-            throw $e;
-        }
-
-        $subscription->update([
-            'subscribed_to_daily' => $request->boolean('subscribed_to_daily'),
-            'subscribed_to_weekly' => $request->boolean('subscribed_to_weekly'),
-            'subscribed_to_notifications' => $request->boolean('subscribed_to_notifications'),
-            'unsubscribed_at' => null,
+        // 创建续费订单
+        $order = Order::create([
+            'order_no' => 'R' . date('YmdHis') . rand(1000, 9999),
+            'user_id' => Auth::id(),
+            'product_type' => 'subscription',
+            'product_id' => $subscription->id,
+            'amount' => $this->getRenewalPrice($subscription->plan),
+            'status' => 'pending',
+            'remark' => '续费：' . $subscription->plan,
         ]);
 
-        if ($request->expectsJson()) {
-            return response()->json([
-                'success' => true,
-                'message' => '订阅偏好已更新',
-                'subscription' => [
-                    'subscribed_to_daily' => $subscription->subscribed_to_daily,
-                    'subscribed_to_weekly' => $subscription->subscribed_to_weekly,
-                    'subscribed_to_notifications' => $subscription->subscribed_to_notifications,
-                ],
-            ]);
+        return redirect()->route('payments.show', $order->order_no)
+            ->with('success', '请完成支付');
+    }
+
+    /**
+     * 升级订阅
+     */
+    public function upgrade(Request $request)
+    {
+        $request->validate([
+            'new_plan' => 'required|in:monthly,yearly,lifetime',
+        ]);
+
+        $subscription = Subscription::where('user_id', Auth::id())
+            ->where('status', 'active')
+            ->latest()
+            ->first();
+
+        if (!$subscription) {
+            return back()->with('error', '没有有效的订阅');
         }
 
-        return redirect()
-            ->route('subscriptions.preferences')
-            ->with('success', '订阅偏好已更新');
+        // 计算升级差价
+        $upgradePrice = $this->calculateUpgradePrice($subscription->plan, $request->new_plan);
+
+        // 创建升级订单
+        $order = Order::create([
+            'order_no' => 'U' . date('YmdHis') . rand(1000, 9999),
+            'user_id' => Auth::id(),
+            'product_type' => 'subscription',
+            'product_id' => $subscription->id,
+            'amount' => $upgradePrice,
+            'status' => 'pending',
+            'remark' => "升级：{$subscription->plan} → {$request->new_plan}",
+        ]);
+
+        return redirect()->route('payments.show', $order->order_no)
+            ->with('success', '请完成支付');
+    }
+
+    /**
+     * 设置自动续费
+     */
+    public function toggleAutoRenew($id)
+    {
+        $subscription = Subscription::where('user_id', Auth::id())->findOrFail($id);
+        
+        $subscription->update([
+            'auto_renew' => $subscription->auto_renew ? '0' : '1',
+        ]);
+
+        return back()->with('success', '自动续费已' . ($subscription->auto_renew ? '开启' : '关闭'));
+    }
+
+    /**
+     * 取消订阅
+     */
+    public function cancel($id)
+    {
+        $subscription = Subscription::where('user_id', Auth::id())->findOrFail($id);
+        
+        $subscription->update([
+            'status' => 'cancelled',
+        ]);
+
+        $this->notificationService->send(
+            Auth::user(),
+            '订阅已取消',
+            '您的订阅已取消，到期后将不再续费。'
+        );
+
+        return back()->with('success', '订阅已取消');
+    }
+
+    /**
+     * 获取续费价格
+     */
+    protected function getRenewalPrice($plan)
+    {
+        $prices = [
+            'monthly' => 29,
+            'yearly' => 199,
+            'lifetime' => 999,
+        ];
+        return $prices[$plan] ?? 0;
+    }
+
+    /**
+     * 计算升级差价
+     */
+    protected function calculateUpgradePrice($fromPlan, $toPlan)
+    {
+        $prices = [
+            'monthly' => 29,
+            'yearly' => 199,
+            'lifetime' => 999,
+        ];
+
+        $fromPrice = $prices[$fromPlan] ?? 0;
+        $toPrice = $prices[$toPlan] ?? 0;
+
+        return max(0, $toPrice - $fromPrice);
     }
 }

@@ -22,7 +22,6 @@ class HomeController extends Controller
      */
     public function index()
     {
-        // MAX 版本直接返回新视图，不需要数据
         return view('max.home');
     }
 

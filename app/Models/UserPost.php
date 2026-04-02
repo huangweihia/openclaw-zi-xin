@@ -5,28 +5,21 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class SideHustleCase extends Model
+class UserPost extends Model
 {
     use HasFactory;
 
     protected $fillable = [
-        'title', 'slug', 'summary', 'content',
-        'category', 'type', 'startup_cost', 'time_investment',
-        'estimated_income', 'actual_income', 'income_screenshots',
-        'steps', 'tools', 'pitfalls',
-        'willing_to_consult', 'contact_info',
+        'user_id', 'type', 'title', 'content',
+        'category', 'tags', 'cover_image', 'attachments',
         'visibility', 'status',
-        'user_id', 'audited_by', 'audit_note', 'audited_at',
+        'audit_note', 'audited_by', 'audited_at',
         'view_count', 'like_count', 'comment_count', 'favorite_count',
     ];
 
     protected $casts = [
-        'income_screenshots' => 'array',
-        'tools' => 'array',
-        'pitfalls' => 'array',
-        'willing_to_consult' => 'boolean',
-        'estimated_income' => 'decimal:2',
-        'actual_income' => 'decimal:2',
+        'tags' => 'array',
+        'attachments' => 'array',
         'audited_at' => 'datetime',
     ];
 
@@ -58,15 +51,27 @@ class SideHustleCase extends Model
     public function scopeVisible($query, $user = null)
     {
         return $query->where(function ($q) use ($user) {
-            $q->where('visibility', 'public');
+            $q->where('visibility', 'public')
+              ->where('status', 'approved');
             
-            if ($user && $user->isVip()) {
-                $q->orWhere('visibility', 'vip');
-            }
-            
-            if ($user && $user->id === $this->user_id) {
-                $q->orWhere('visibility', 'private');
+            if ($user) {
+                $q->orWhere(function ($q2) use ($user) {
+                    $q2->where('user_id', $user->id);
+                });
             }
         });
+    }
+
+    // 类型名称
+    public function getTypeNameAttribute()
+    {
+        $types = [
+            'case' => '副业案例',
+            'tool' => '工具推荐',
+            'experience' => '经验心得',
+            'resource' => '资源分享',
+            'question' => '问答求助',
+        ];
+        return $types[$this->type] ?? $this->type;
     }
 }
